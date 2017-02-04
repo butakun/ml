@@ -1,4 +1,6 @@
 import tensorflow as tf
+import numpy as np
+import pickle
 tf.logging.set_verbosity(tf.logging.INFO)
 
 from tensorflow.examples.tutorials.mnist import input_data
@@ -68,19 +70,41 @@ def Main():
 
 	init = tf.global_variables_initializer()
 
-	sess = tf.Session()
+	config = tf.ConfigProto(
+		device_count = {"GPU":0}
+#		log_device_placement = True
+		)
+	sess = tf.Session(config = config)
 	sess.run(init)
 
+	history = {"TRAIN":[], "TEST":[]}
 	for i in range(20000):
 		batch_xs, batch_ys = mnist.train.next_batch(50)
 		if i % 50 == 0:
 			accuracy_train = sess.run(accuracy, feed_dict = {x:batch_xs, y_:batch_ys, keep_prob:1.0})
 			print "TRAIN: step %d, accuracy = %f" % (i, accuracy_train)
+			history["TRAIN"].append((i, accuracy_train))
 		if i % 1000 == 0:
-			print "TEST: accuracy = %f" % sess.run(accuracy, feed_dict = {x:mnist.test.images, y_:mnist.test.labels, keep_prob:1.0})
+			accuracy_test = sess.run(accuracy, feed_dict = {x:mnist.test.images, y_:mnist.test.labels, keep_prob:1.0})
+			print "TEST: step %d, accuracy = %f" % (i, accuracy_test)
+			history["TEST"].append((i, accuracy_test))
 		sess.run(train_step, feed_dict = {x:batch_xs, y_:batch_ys, keep_prob:0.5})
 
-	print "TEST: accuracy = %f" % sess.run(accuracy, feed_dict = {x:mnist.test.images, y_:mnist.test.labels, keep_prob:1.0})
+	accuracy_test = sess.run(accuracy, feed_dict = {x:mnist.test.images, y_:mnist.test.labels, keep_prob:1.0})
+	print "TEST: final accuracy = %f" % accuracy_test
+	history["TEST"].append((i, accuracy_test))
+
+	params = {}
+	params["W_conv1"] = W_conv1.eval(sess)
+	params["b_conv1"] = b_conv1.eval(sess)
+	params["W_conv2"] = W_conv2.eval(sess)
+	params["b_conv2"] = b_conv2.eval(sess)
+	params["W_fc1"] = W_fc1.eval(sess)
+	params["b_fc1"] = b_fc1.eval(sess)
+	params["W_fc2"] = W_fc2.eval(sess)
+	params["b_fc2"] = b_fc2.eval(sess)
+
+	pickle.dump({"history":history, "params":params}, open("mnist_deep.pickled", "w"))
 
 if __name__ == "__main__":
 	Main()
