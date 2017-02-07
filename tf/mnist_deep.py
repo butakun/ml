@@ -6,6 +6,8 @@ tf.logging.set_verbosity(tf.logging.INFO)
 
 from tensorflow.examples.tutorials.mnist import input_data
 
+LOGDIR = "./mnist_deep_log"
+
 NETWORK_CONFIG = {
 	"Conv1Features":32,
 	"Conv2Features":64,
@@ -14,11 +16,11 @@ NETWORK_CONFIG = {
 
 def WeightVar(shape):
 
-	return tf.Variable(tf.truncated_normal(shape, stddev = 0.1))
+	return tf.Variable(tf.truncated_normal(shape, stddev = 0.1), name = "W")
 
 def BiasVar(shape):
 
-	return tf.Variable(tf.constant(0.1, shape = shape))
+	return tf.Variable(tf.constant(0.1, shape = shape), name = "b")
 
 def Conv2D(x, W):
 
@@ -30,50 +32,70 @@ def MaxPool(x, shape):
 
 def Main():
 
+	if tf.gfile.Exists(LOGDIR):
+		tf.gfile.DeleteRecursively(LOGDIR)
+	tf.gfile.MakeDirs(LOGDIR)
+
 	mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
-	x = tf.placeholder(tf.float32, [None, 784])
+	# Input
+	with tf.name_scope("input"):
+		x = tf.placeholder(tf.float32, [None, 784], name = "x-input")
+		y_ = tf.placeholder(tf.float32, [None, 10], name = "y-input")
 
-	x_image = tf.reshape(x, [-1, 28, 28, 1])
-
-	# ReLU(Wx + b)
-	W_conv1 = WeightVar([5, 5, 1, NETWORK_CONFIG["Conv1Features"]])
-	b_conv1 = BiasVar([NETWORK_CONFIG["Conv1Features"]])
-	h_conv1 = tf.nn.relu(Conv2D(x_image, W_conv1) + b_conv1)
-
-	# Pooling
-	h_pool1 = MaxPool(h_conv1, [2, 2])
+	with tf.name_scope("input_reshaped"):
+		x_image = tf.reshape(x, [-1, 28, 28, 1], name = "x-reshaped")
+		tf.summary.image("input", x_image, 10)
 
 	# ReLU(Wx + b)
-	W_conv2 = WeightVar([5, 5, NETWORK_CONFIG["Conv1Features"], NETWORK_CONFIG["Conv2Features"]])
-	b_conv2 = BiasVar([NETWORK_CONFIG["Conv2Features"]])
-	h_conv2 = tf.nn.relu(Conv2D(h_pool1, W_conv2) + b_conv2)
+	with tf.name_scope("Conv1"):
+		W_conv1 = WeightVar([5, 5, 1, NETWORK_CONFIG["Conv1Features"]])
+		b_conv1 = BiasVar([NETWORK_CONFIG["Conv1Features"]])
+		h_conv1 = tf.nn.relu(Conv2D(x_image, W_conv1) + b_conv1, name = "ReLU")
 
 	# Pooling
-	h_pool2 = MaxPool(h_conv2, [2, 2])
+	with tf.name_scope("MaxPool1"):
+		h_pool1 = MaxPool(h_conv1, [2, 2])
+
+	# ReLU(Wx + b)
+	with tf.name_scope("Conv2"):
+		W_conv2 = WeightVar([5, 5, NETWORK_CONFIG["Conv1Features"], NETWORK_CONFIG["Conv2Features"]])
+		b_conv2 = BiasVar([NETWORK_CONFIG["Conv2Features"]])
+		h_conv2 = tf.nn.relu(Conv2D(h_pool1, W_conv2) + b_conv2, name = "ReLU")
+
+	# Pooling
+	with tf.name_scope("MaxPool2"):
+		h_pool2 = MaxPool(h_conv2, [2, 2])
 
 	# FC1
-	W_fc1 = WeightVar([7 * 7 * NETWORK_CONFIG["Conv2Features"], NETWORK_CONFIG["FC1Features"]])
-	b_fc1 = BiasVar([NETWORK_CONFIG["FC1Features"]])
-	h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * NETWORK_CONFIG["Conv2Features"]])
-	h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
+	with tf.name_scope("FC1"):
+		W_fc1 = WeightVar([7 * 7 * NETWORK_CONFIG["Conv2Features"], NETWORK_CONFIG["FC1Features"]])
+		b_fc1 = BiasVar([NETWORK_CONFIG["FC1Features"]])
+		h_pool2_flat = tf.reshape(h_pool2, [-1, 7 * 7 * NETWORK_CONFIG["Conv2Features"]], name = "reshape")
+		h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1, name = "ReLU")
 
 	# Dropout
-	keep_prob = tf.placeholder(tf.float32) # probabiity to keep signals
-	h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
+	with tf.name_scope("DropOut"):
+		keep_prob = tf.placeholder(tf.float32, name = "keep_prob") # probabiity to keep signals
+		h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
 	# FC2
-	W_fc2 = WeightVar([NETWORK_CONFIG["FC1Features"], 10])
-	b_fc2 = BiasVar([10])
-	y = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
+	with tf.name_scope("FC2"):
+		W_fc2 = WeightVar([NETWORK_CONFIG["FC1Features"], 10])
+		b_fc2 = BiasVar([10])
+		y = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
 
-	y_ = tf.placeholder(tf.float32, [None, 10])
-	cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, y_))
+	# Loss
+	with tf.name_scope("Loss"):
+		cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, y_))
+
 	#train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
 	train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
 
-	correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
-	accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+	# Accuracy
+	with tf.name_scope("Accuracy"):
+		correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
+		accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 	init = tf.global_variables_initializer()
 
@@ -83,6 +105,8 @@ def Main():
 		)
 	sess = tf.Session(config = config)
 	sess.run(init)
+
+	writer = tf.summary.FileWriter(LOGDIR + "/train", sess.graph)
 
 	history = {"TRAIN":[], "TEST":[]}
 	for i in range(20000):
@@ -100,6 +124,8 @@ def Main():
 	accuracy_test = sess.run(accuracy, feed_dict = {x:mnist.test.images, y_:mnist.test.labels, keep_prob:1.0})
 	print "TEST: final accuracy = %f" % accuracy_test
 	history["TEST"].append((i, accuracy_test))
+
+	writer.close()
 
 	params = {}
 	params["NetworkConfig"] = NETWORK_CONFIG
