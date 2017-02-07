@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import pickle
+import matplotlib.pyplot as plt
 tf.logging.set_verbosity(tf.logging.INFO)
 
 from tensorflow.examples.tutorials.mnist import input_data
@@ -106,6 +107,26 @@ def Main():
 
 	pickle.dump({"history":history, "params":params}, open("mnist_deep.pickled", "w"))
 
+def Vis():
+
+	data = pickle.load(open("mnist_deep.pickled"))
+	params = data["params"]
+	W_conv1 = params["W_conv1"]
+
+	nRows, nCols = 4, 8
+	cmap = plt.get_cmap("gray")
+	fig, axes = plt.subplots(nRows, nCols)
+	axesFlat = axes.flatten()
+	for row in range(nRows):
+		for col in range(nCols):
+			i = (row * nCols) + col
+			img = W_conv1[:, :, 0, i]
+			axesFlat[i].get_xaxis().set_visible(False)
+			axesFlat[i].get_yaxis().set_visible(False)
+			axesFlat[i].imshow(img, cmap = cmap)
+	plt.show()
+
 if __name__ == "__main__":
+	#Vis()
 	Main()
 
