@@ -134,6 +134,9 @@ def Vis():
 	plt.show()
 
 if __name__ == "__main__":
-	#Vis()
-	Main()
+	import sys
+	if len(sys.argv) > 1 and sys.argv[1] == "vis":
+		Vis()
+	else:
+		Main()
 
