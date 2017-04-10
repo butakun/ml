@@ -8,7 +8,7 @@ def f(theta, x, y):
 	h = 1.0 / (1.0 + np.exp(-np.dot(theta, x)))
 	#print "theta x = ", np.dot(theta, x)
 	J = -np.sum(y * np.log(h) + (1.0 - y) * np.log(1.0 - h))
-	print "cost = ", J
+	#print "cost = ", J
 	return J
 
 def fprime(theta, x, y):
@@ -28,7 +28,7 @@ def Test(theta, x, y):
 	ytest = 1.0 / (1.0 + np.exp(-np.dot(theta, x)))
 	d = np.rint(ytest) - y
 	f = np.sum(np.abs(d))
-	print "wrong classifications = %d out of %d samples" % (f, len(y))
+	print "wrongly classified = %d out of %d samples" % (f, len(y))
 
 def Main():
 
